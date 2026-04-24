@@ -14,51 +14,71 @@
 
 Program::Program() = default;
 
-Program::~Program() = default;
+Program::~Program() {
+    clear();
+}
 
 void Program::clear() {
-    // Replace this stub with your own code
-    //todo
+    sourceLines.clear();
+    for (auto const& [lineNumber, stmt] : parsedStatements) {
+        delete stmt;
+    }
+    parsedStatements.clear();
 }
 
 void Program::addSourceLine(int lineNumber, const std::string &line) {
-    // Replace this stub with your own code
-    //todo
+    sourceLines[lineNumber] = line;
+    if (parsedStatements.count(lineNumber)) {
+        delete parsedStatements[lineNumber];
+        parsedStatements.erase(lineNumber);
+    }
 }
 
 void Program::removeSourceLine(int lineNumber) {
-    // Replace this stub with your own code
-    //todo
+    sourceLines.erase(lineNumber);
+    if (parsedStatements.count(lineNumber)) {
+        delete parsedStatements[lineNumber];
+        parsedStatements.erase(lineNumber);
+    }
 }
 
 std::string Program::getSourceLine(int lineNumber) {
-    // Replace this stub with your own code
-    //todo
+    if (sourceLines.count(lineNumber)) {
+        return sourceLines[lineNumber];
+    }
+    return "";
 }
 
 void Program::setParsedStatement(int lineNumber, Statement *stmt) {
-    // Replace this stub with your own code
-    //todo
+    if (sourceLines.count(lineNumber) == 0) {
+        error("Line number does not exist");
+    }
+    if (parsedStatements.count(lineNumber)) {
+        delete parsedStatements[lineNumber];
+    }
+    parsedStatements[lineNumber] = stmt;
 }
 
-//void Program::removeSourceLine(int lineNumber) {
-
 Statement *Program::getParsedStatement(int lineNumber) {
-   // Replace this stub with your own code
-   //todo
+    if (parsedStatements.count(lineNumber)) {
+        return parsedStatements[lineNumber];
+    }
+    return nullptr;
 }
 
 int Program::getFirstLineNumber() {
-    // Replace this stub with your own code
-    //todo
+    if (sourceLines.empty()) {
+        return -1;
+    }
+    return sourceLines.begin()->first;
 }
 
 int Program::getNextLineNumber(int lineNumber) {
-    // Replace this stub with your own code
-    //todo
+    auto it = sourceLines.upper_bound(lineNumber);
+    if (it == sourceLines.end()) {
+        return -1;
+    }
+    return it->first;
 }
-
-//more func to add
-//todo
 
 

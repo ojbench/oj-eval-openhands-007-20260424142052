@@ -17,7 +17,6 @@
 #include "evalstate.hpp"
 #include "exp.hpp"
 #include "Utils/tokenScanner.hpp"
-#include "program.hpp"
 #include "parser.hpp"
 #include "Utils/error.hpp"
 #include "Utils/strlib.hpp"
@@ -38,39 +37,71 @@ class Statement {
 
 public:
 
-/*
- * Constructor: Statement
- * ----------------------
- * The base class constructor is empty.  Each subclass must provide
- * its own constructor.
- */
-
     Statement();
-
-/*
- * Destructor: ~Statement
- * Usage: delete stmt;
- * -------------------
- * The destructor deallocates the storage for this expression.
- * It must be declared virtual to ensure that the correct subclass
- * destructor is called when deleting a statement.
- */
 
     virtual ~Statement();
 
-/*
- * Method: execute
- * Usage: stmt->execute(state);
- * ----------------------------
- * This method executes a BASIC statement.  Each of the subclasses
- * defines its own execute method that implements the necessary
- * operations.  As was true for the expression evaluator, this
- * method takes an EvalState object for looking up variables or
- * controlling the operation of the interpreter.
- */
-
     virtual void execute(EvalState &state, Program &program) = 0;
 
+};
+
+class RemStatement : public Statement {
+public:
+    RemStatement() {}
+    virtual void execute(EvalState &state, Program &program) override;
+};
+
+class LetStatement : public Statement {
+public:
+    LetStatement(std::string var, Expression *exp) : var(var), exp(exp) {}
+    virtual ~LetStatement() { delete exp; }
+    virtual void execute(EvalState &state, Program &program) override;
+private:
+    std::string var;
+    Expression *exp;
+};
+
+class PrintStatement : public Statement {
+public:
+    PrintStatement(Expression *exp) : exp(exp) {}
+    virtual ~PrintStatement() { delete exp; }
+    virtual void execute(EvalState &state, Program &program) override;
+private:
+    Expression *exp;
+};
+
+class InputStatement : public Statement {
+public:
+    InputStatement(std::string var) : var(var) {}
+    virtual void execute(EvalState &state, Program &program) override;
+private:
+    std::string var;
+};
+
+class EndStatement : public Statement {
+public:
+    EndStatement() {}
+    virtual void execute(EvalState &state, Program &program) override;
+};
+
+class GotoStatement : public Statement {
+public:
+    GotoStatement(int lineNumber) : lineNumber(lineNumber) {}
+    virtual void execute(EvalState &state, Program &program) override;
+private:
+    int lineNumber;
+};
+
+class IfStatement : public Statement {
+public:
+    IfStatement(Expression *lhs, std::string op, Expression *rhs, int lineNumber)
+        : lhs(lhs), op(op), rhs(rhs), lineNumber(lineNumber) {}
+    virtual ~IfStatement() { delete lhs; delete rhs; }
+    virtual void execute(EvalState &state, Program &program) override;
+private:
+    Expression *lhs, *rhs;
+    std::string op;
+    int lineNumber;
 };
 
 
