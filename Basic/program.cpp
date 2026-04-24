@@ -51,6 +51,7 @@ std::string Program::getSourceLine(int lineNumber) {
 
 void Program::setParsedStatement(int lineNumber, Statement *stmt) {
     if (sourceLines.count(lineNumber) == 0) {
+        delete stmt;
         error("Line number does not exist");
     }
     if (parsedStatements.count(lineNumber)) {

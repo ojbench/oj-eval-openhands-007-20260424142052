@@ -24,23 +24,29 @@ Statement* parseStatement(TokenScanner &scanner);
 void executeProgram(Program &program, EvalState &state);
 void listProgram(Program &program);
 
+class QuitException {};
+
 /* Main program */
 
 int main() {
     EvalState state;
     Program program;
-    while (true) {
-        try {
-            std::string input;
-            if (!getline(std::cin, input)) break;
-            if (input.empty())
-                continue;
-            processLine(input, program, state);
-        } catch (ErrorException &ex) {
-            std::cout << ex.getMessage() << std::endl;
-        } catch (int jumpLine) {
-            // Should not happen in main loop unless RUN is called
+    try {
+        while (true) {
+            try {
+                std::string input;
+                if (!getline(std::cin, input)) break;
+                if (input.empty())
+                    continue;
+                processLine(input, program, state);
+            } catch (ErrorException &ex) {
+                std::cout << ex.getMessage() << std::endl;
+            } catch (int jumpLine) {
+                // Should not happen in main loop unless RUN is called
+            }
         }
+    } catch (QuitException &ex) {
+        // Exit normally
     }
     return 0;
 }
@@ -57,19 +63,25 @@ Statement* parseStatement(TokenScanner &scanner) {
             if (var == kw) error("SYNTAX ERROR");
         }
         if (scanner.nextToken() != "=") error("SYNTAX ERROR");
-        Expression *exp = readE(scanner, 0);
-        if (scanner.hasMoreTokens()) {
-            delete exp;
-            error("SYNTAX ERROR");
+        Expression *exp = nullptr;
+        try {
+            exp = readE(scanner, 0);
+            if (scanner.hasMoreTokens()) error("SYNTAX ERROR");
+            return new LetStatement(var, exp);
+        } catch (...) {
+            if (exp) delete exp;
+            throw;
         }
-        return new LetStatement(var, exp);
     } else if (token == "PRINT") {
-        Expression *exp = readE(scanner, 0);
-        if (scanner.hasMoreTokens()) {
-            delete exp;
-            error("SYNTAX ERROR");
+        Expression *exp = nullptr;
+        try {
+            exp = readE(scanner, 0);
+            if (scanner.hasMoreTokens()) error("SYNTAX ERROR");
+            return new PrintStatement(exp);
+        } catch (...) {
+            if (exp) delete exp;
+            throw;
         }
-        return new PrintStatement(exp);
     } else if (token == "INPUT") {
         std::string var = scanner.nextToken();
         if (var == "") error("SYNTAX ERROR");
@@ -89,28 +101,24 @@ Statement* parseStatement(TokenScanner &scanner) {
         if (scanner.hasMoreTokens()) error("SYNTAX ERROR");
         return new GotoStatement(line);
     } else if (token == "IF") {
-        Expression *lhs = readE(scanner, 1); // Use precedence 1 to stop at =, <, >
-        std::string op = scanner.nextToken();
-        if (op != "=" && op != "<" && op != ">") {
-            delete lhs;
-            error("SYNTAX ERROR");
+        Expression *lhs = nullptr;
+        Expression *rhs = nullptr;
+        try {
+            lhs = readE(scanner, 1); // Use precedence 1 to stop at =, <, >
+            std::string op = scanner.nextToken();
+            if (op != "=" && op != "<" && op != ">") error("SYNTAX ERROR");
+            rhs = readE(scanner, 1);
+            if (scanner.nextToken() != "THEN") error("SYNTAX ERROR");
+            std::string next = scanner.nextToken();
+            if (next == "" || !isdigit(next[0])) error("SYNTAX ERROR");
+            int line = std::stoi(next);
+            if (scanner.hasMoreTokens()) error("SYNTAX ERROR");
+            return new IfStatement(lhs, op, rhs, line);
+        } catch (...) {
+            if (lhs) delete lhs;
+            if (rhs) delete rhs;
+            throw;
         }
-        Expression *rhs = readE(scanner, 1);
-        if (scanner.nextToken() != "THEN") {
-            delete lhs; delete rhs;
-            error("SYNTAX ERROR");
-        }
-        std::string next = scanner.nextToken();
-        if (next == "" || !isdigit(next[0])) {
-            delete lhs; delete rhs;
-            error("SYNTAX ERROR");
-        }
-        int line = std::stoi(next);
-        if (scanner.hasMoreTokens()) {
-            delete lhs; delete rhs;
-            error("SYNTAX ERROR");
-        }
-        return new IfStatement(lhs, op, rhs, line);
     } else {
         error("SYNTAX ERROR");
     }
@@ -174,23 +182,28 @@ void processLine(std::string line, Program &program, EvalState &state) {
                 program.clear();
                 state.Clear();
             } else if (token == "QUIT") {
-                exit(0);
+                throw QuitException();
             } else if (token == "HELP") {
                 // Optional
             } else {
                 // Immediate execution of statements
                 scanner.setInput(line); // Reset scanner to include the first token
-                Statement *stmt = parseStatement(scanner);
-                if (stmt) {
-                    try {
+                Statement *stmt = nullptr;
+                try {
+                    stmt = parseStatement(scanner);
+                    if (stmt) {
                         stmt->execute(state, program);
-                    } catch (int jump) {
-                        if (jump != 0) {
-                            // For GOTO/IF in immediate mode, we start execution from that line
-                            executeProgram(program, state);
-                        }
+                        delete stmt;
                     }
+                } catch (int jump) {
                     delete stmt;
+                    if (jump != 0) {
+                        // For GOTO/IF in immediate mode, we start execution from that line
+                        executeProgram(program, state);
+                    }
+                } catch (...) {
+                    delete stmt;
+                    throw;
                 }
             }
         }
